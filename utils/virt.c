@@ -15,6 +15,7 @@ virt_t* new_virtd()
     newobj->running=1;
     if(newobj!=NULL){
         newobj->vd_tun_init = &vd_tun_init;
+        newobj->vd_tap_init = &vd_tap_init;
         newobj->vd_tun_run = &vd_tun_run;
     }
 
@@ -29,6 +30,7 @@ int vd_tun_init(virt_t *obj, char* ifname, char* ipaddr, char* netmask)
     memset(obj->netmask, 0, 16);
 
     /* assign */
+    obj->type = d_TUN;
     strncpy(obj->ifname, ifname, IF_NAMESIZE-1);
     strncpy(obj->ipaddr, ipaddr, 15);
     strncpy(obj->netmask, netmask, 15);
@@ -54,6 +56,40 @@ int vd_tun_init(virt_t *obj, char* ifname, char* ipaddr, char* netmask)
     epoll_ctl(obj->epfd, EPOLL_CTL_ADD, obj->fd, &obj->ev);
 }
 
+int vd_tap_init(virt_t *obj, char* ifname, char* ipaddr, char* netmask)
+{
+    /* init & clear */
+    memset(obj->ifname, 0 , IF_NAMESIZE);
+    memset(obj->ipaddr, 0, 16);
+    memset(obj->netmask, 0, 16);
+
+    /* assign */
+    obj->type = d_TAP;
+    strncpy(obj->ifname, ifname, IF_NAMESIZE-1);
+    strncpy(obj->ipaddr, ipaddr, 15);
+    strncpy(obj->netmask, netmask, 15);
+
+    printf( "Interface: %s\n", obj->ifname );
+    printf( "IP Address: %s\n", obj->ipaddr );
+    printf( "Netmask: %s\n", obj->netmask );
+
+    /* create tunnel instance */
+    if((obj->fd=tun_alloc(obj->ifname, IFF_TAP | IFF_NO_PI)) < 0)
+    {
+        printf("Create TAP interface fail!\n");
+    }
+
+    /* set net (interface) */
+    set_net(obj->ifname, obj->ipaddr, obj->netmask);
+
+    /* create epoll */
+    obj->epfd = epoll_create(EPOLL_SIZE);
+    obj->events = malloc(EPOLL_SIZE*sizeof(struct epoll_event));
+    obj->ev.data.fd = obj->fd;
+    obj->ev.events = EPOLLIN | EPOLLET;
+    epoll_ctl(obj->epfd, EPOLL_CTL_ADD, obj->fd, &obj->ev);
+}
+
 void vd_tun_run(virt_t *obj)
 {
     while(obj->running)
@@ -63,8 +99,9 @@ void vd_tun_run(virt_t *obj)
         {
             if(obj->events[i].events & EPOLLIN && obj->fd == obj->events[i].data.fd)
             {
-                memset(obj->buffer, 0, 1024);
-                if((obj->rcvlen=read(obj->fd, obj->buffer, 1024))<0)
+                memset(obj->buffer, 0, BUF_SIZE);
+                // printf("\n");
+                if((obj->rcvlen=read(obj->fd, obj->buffer, BUF_SIZE))<0)
                 {
                     perror("Reading data");
                     obj->running=0;
@@ -73,12 +110,24 @@ void vd_tun_run(virt_t *obj)
                 {
                     // If using TUN, we parse this as an IP packet
                     // If using TAP, buffer will be an Ethernet frame
-                    print_ip_packet(obj->buffer, obj->rcvlen);
+                    if(obj->type == d_TUN)
+                    {
+                        print_ip_packet(obj->buffer, obj->rcvlen);
+                    }
+                    else
+                    {
+                        print_eth_packet(obj->buffer, obj->rcvlen);
+                    } 
                 }
                 
             }
         }
     }
+}
+
+void print_eth_packet(unsigned char *packet, int size)
+{
+
 }
 
 void print_ip_packet(unsigned char *packet, int size)
@@ -173,7 +222,9 @@ int set_net(char *dev, char *ipaddr, char *netmask)
 
     /* set the interface name */
     if(*dev)
+    {
         strncpy(ifr.ifr_name, dev, IF_NAMESIZE);
+    }
     ifr.ifr_addr.sa_family=AF_INET; // ipv4
 
     /* set ip address 
@@ -222,9 +273,9 @@ int set_net(char *dev, char *ipaddr, char *netmask)
         return err;
     }
     ifr.ifr_flags |= ( IFF_UP | IFF_RUNNING );
-    if((err=ioctl(fd, SIOCGIFFLAGS, &ifr))<0)
+    if((err=ioctl(fd, SIOCSIFFLAGS, &ifr))<0)
     {
-        perror( "ioctl(SIOCGIFFLAGS)" );
+        perror( "ioctl(SIOCSIFFLAGS)" );
         close(fd);
         return err;
     }

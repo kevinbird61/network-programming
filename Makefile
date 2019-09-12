@@ -1,7 +1,7 @@
 EXEC:=
 CC:=gcc
 OBJS:= virt.o 
-TEST:= test_tun.out
+TEST:= test_tun.out test_tap.out
 
 all: $(EXEC) $(OBJS)
 test: $(TEST)
@@ -9,7 +9,7 @@ test: $(TEST)
 %.o: utils/%.c 
 	$(CC) -c $^
 
-test_tun.out: test/test_tun.c virt.o
+%.out: test/%.c virt.o
 	$(CC) -o $@ $^
 
 .PHONY: clean
