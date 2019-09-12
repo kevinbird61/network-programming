@@ -15,7 +15,7 @@
 
 #include <string.h>
 
-int tun_alloc( char *dev, int flags);
+int tun_alloc(char *dev, int flags);
 int set_ip(char *dev, char *ipaddr, char *netmask);
 void print_ip_packet(unsigned char *packet, int size);
 
@@ -147,7 +147,7 @@ int set_ip(char *dev, char *ipaddr, char *netmask)
     
     // ioctl needs one fd as an input.
     // Request kernel to give me an unused fd. 
-    int fd = socket( PF_INET, SOCK_DGRAM, IPPROTO_IP );
+    int fd = socket(PF_INET, SOCK_DGRAM, IPPROTO_IP);
     
     // Set the interface name.
     if ( *dev ) 
@@ -282,7 +282,7 @@ void print_ip_packet(unsigned char *packet, int size)
     
     printf( "Data Payload:\n\t" );
 
-    for( i = offset ; i < size ; i++ )
+    for(int i = offset ; i < size ; i++ )
     {
         printf( "%02X ", packet[i] );
         
