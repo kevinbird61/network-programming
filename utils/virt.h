@@ -10,11 +10,21 @@
 #include <linux/if_tun.h>   // tun/tap
 #include <errno.h>
 #include <unistd.h>         // close
-
 #include <sys/epoll.h>
+
+#include "packet_format.h"
 
 #define EPOLL_SIZE 5
 #define BUF_SIZE 1500       // 1500 (MTU size)
+#define SIZE_ETHER 14
+
+/* define header */
+const struct sniff_ethernet *ethernet; // ethernet header
+const struct sniff_ipv4 *ipv4; // IPv4 header
+const struct sniff_tcp *tcp;   // TCP header
+const struct sniff_udp *udp;   // UDP header
+const struct sniff_icmp *icmp; // ICMP header
+const char *payload; // packet payload
 
 typedef enum {d_TUN=0, d_TAP=1} device_t; 
 
@@ -47,6 +57,7 @@ void vd_tun_run(virt_t *);
 /* helper function */
 int tun_alloc(char *dev, int flags);
 int set_net(char *dev, char *ipaddr, char *netmask);
+void print_ip_payload(unsigned char *packet, int size);     // print payload detail
 void print_ip_packet(unsigned char *packet, int size);
 void print_eth_packet(unsigned char *packet, int size);
 

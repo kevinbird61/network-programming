@@ -127,10 +127,105 @@ void vd_tun_run(virt_t *obj)
 
 void print_eth_packet(unsigned char *packet, int size)
 {
+    ethernet = (struct sniff_ethernet*)(packet);
+    unsigned int size_existed = SIZE_ETHER;
 
+    // parse IPv4 
+    if(ntohs(ethernet->etherType)==ETHERTYPE_IP)
+    {
+        ipv4 = (struct sniff_ipv4*)(packet + SIZE_ETHER);
+        unsigned int size_ip = IP_HL(ipv4)*4;
+        size_existed += size_ip;
+
+        // get ip 
+        printf("srcIP: %s\n", inet_ntoa(ipv4->srcAddr));
+        printf("dstIP: %s\n", inet_ntoa(ipv4->dstAddr));
+
+        if(size_ip < 20)
+        {
+            printf("Invalid IPv4 header length: %u bytes\n", size_ip);
+        } else 
+        {
+            // Parse TCP 
+            if(ipv4->protocol == (unsigned char)6){
+                tcp = (struct sniff_tcp*)(packet + SIZE_ETHER + size_ip);
+                unsigned int size_tcp = TH_OFF(tcp)*4;
+                size_existed += size_tcp;
+
+                printf("[TCP] srcPort: %u\n", tcp->sport);
+                printf("[TCP] dstPort: %u\n", tcp->dport);
+            } else if(ipv4->protocol == (unsigned char)17)
+            {
+                udp = (struct sniff_udp*)(packet + SIZE_ETHER + size_ip);
+                unsigned int size_udp = 8; // 8 bytes
+                size_existed += size_udp;
+
+                printf("[UDP] srcPort: %u\n", udp->sport);
+                printf("[UDP] dstPort: %u\n", udp->dport);
+            } else if(ipv4->protocol == (unsigned char)1)
+            {
+                icmp = (struct sniff_icmp*)(packet + SIZE_ETHER + size_ip);
+                unsigned int size_icmp = 4; // 4 bytes
+                size_existed += size_icmp;
+            }
+        }
+    } else if(ntohs(ethernet->etherType) == ETHERTYPE_IPV6)
+    { 
+        // ipv6 
+    } else if(ntohs(ethernet->etherType) == ETHERTYPE_ARP)
+    {
+        // arp
+    } else 
+    {
+        // other 
+    }
+
+    payload = (char*)(packet + size_existed);
 }
 
 void print_ip_packet(unsigned char *packet, int size)
+{
+    ipv4 = (struct sniff_ipv4*)(packet);
+    unsigned int size_ip = IP_HL(ipv4)*4;
+    unsigned int size_existed = size_ip;
+
+    // get ip 
+    printf("srcIP: %s\n", inet_ntoa(ipv4->srcAddr));
+    printf("dstIP: %s\n", inet_ntoa(ipv4->dstAddr));
+
+    if(size_ip < 20)
+    {
+        printf("Invalid IPv4 header length: %u bytes\n", size_ip);
+    } else 
+    {
+        // Parse TCP 
+        if(ipv4->protocol == (unsigned char)6){
+            tcp = (struct sniff_tcp*)(packet + SIZE_ETHER + size_ip);
+            unsigned int size_tcp = TH_OFF(tcp)*4;
+            size_existed += size_tcp;
+
+            printf("[TCP] srcPort: %u\n", tcp->sport);
+            printf("[TCP] dstPort: %u\n", tcp->dport);
+        } else if(ipv4->protocol == (unsigned char)17)
+        {
+            udp = (struct sniff_udp*)(packet + SIZE_ETHER + size_ip);
+            unsigned int size_udp = 8; // 8 bytes
+            size_existed += size_udp;
+
+            printf("[UDP] srcPort: %u\n", udp->sport);
+            printf("[UDP] dstPort: %u\n", udp->dport);
+        } else if(ipv4->protocol == (unsigned char)1)
+        {
+            icmp = (struct sniff_icmp*)(packet + SIZE_ETHER + size_ip);
+            unsigned int size_icmp = 4; // 4 bytes
+            size_existed += size_icmp;
+        }
+    }
+
+    
+}
+
+void print_ip_payload(unsigned char *packet, int size)
 {
     int ipheaderlen = 0;
     int protocol = 0;
